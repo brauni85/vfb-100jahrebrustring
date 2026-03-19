@@ -195,14 +195,8 @@
 </div>
 
 <script>
-  // ─── Konfiguration ────────────────────────────────────────────────────────
-  const API_KEY  = "DEIN_API_KEY_HIER";      // X-AUTH-APIKEY
-  const BASE_URL = "https://sdn.3qsdn.com/api/v2";
-  // ─────────────────────────────────────────────────────────────────────────
-
-  // URL-Parameter auslesen
+  // API-Key und Projekt-ID werden serverseitig verwaltet (.env)
   const params    = new URLSearchParams(location.search);
-  const projectId = params.get("projectId") || "";
   const fileId    = params.get("fileId") || "";
   const titleHint = params.get("title") || "Video";
 
@@ -210,12 +204,7 @@
   document.getElementById("headerTitle").textContent = titleHint;
 
   async function apiFetch(path) {
-    const response = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        "X-AUTH-APIKEY": API_KEY,
-        "Accept": "application/json"
-      }
-    });
+    const response = await fetch(path);
     if (!response.ok) throw new Error(`API-Fehler ${response.status}: ${response.statusText}`);
     return response.json();
   }
@@ -244,16 +233,16 @@
   }
 
   async function loadVideo() {
-    if (!projectId || !fileId) {
-      showError("Fehlende Parameter", "projectId und fileId müssen in der URL angegeben sein.");
+    if (!fileId) {
+      showError("Fehlende Parameter", "fileId muss in der URL angegeben sein.");
       return;
     }
 
     try {
       // Videodaten und Embed-URL parallel laden
       const [fileData, embedData] = await Promise.all([
-        apiFetch(`/projects/${projectId}/files/${fileId}`),
-        apiFetch(`/projects/${projectId}/files/${fileId}/playouts/default/embed`)
+        apiFetch(`/api/videos/${fileId}`),
+        apiFetch(`/api/videos/${fileId}/embed`)
       ]);
 
       const title       = fileData.FileName || fileData.Title || titleHint;

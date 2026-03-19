@@ -1,0 +1,5 @@
+# Umgebungsvariablen – niemals einchecken!
+.env
+
+# Node.js
+node_modules/
