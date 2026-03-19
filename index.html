@@ -281,21 +281,13 @@
 </main>
 
 <script>
-  // ─── Konfiguration ────────────────────────────────────────────────────────
-  const API_KEY    = "DEIN_API_KEY_HIER";      // X-AUTH-APIKEY
-  const PROJECT_ID = "DEINE_PROJEKT_ID_HIER";  // Numerische Projekt-ID
-  const BASE_URL   = "https://sdn.3qsdn.com/api/v2";
-  // ─────────────────────────────────────────────────────────────────────────
+  // API-Key und Projekt-ID werden serverseitig verwaltet (.env)
+  // Der Browser spricht nur den lokalen Proxy an.
 
   let allVideos = [];
 
   async function apiFetch(path) {
-    const response = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        "X-AUTH-APIKEY": API_KEY,
-        "Accept": "application/json"
-      }
-    });
+    const response = await fetch(path);
     if (!response.ok) {
       throw new Error(`API-Fehler ${response.status}: ${response.statusText}`);
     }
@@ -327,7 +319,7 @@
 
     const card = document.createElement("a");
     card.className = "card";
-    card.href = `video.html?projectId=${encodeURIComponent(PROJECT_ID)}&fileId=${encodeURIComponent(fileId)}&title=${encodeURIComponent(title)}`;
+    card.href = `video.html?fileId=${encodeURIComponent(fileId)}&title=${encodeURIComponent(title)}`;
 
     card.innerHTML = `
       <div class="thumbnail-wrap">
@@ -374,7 +366,7 @@
     const loading = document.getElementById("loading");
     const errEl   = document.getElementById("error");
     try {
-      const data = await apiFetch(`/projects/${PROJECT_ID}/files`);
+      const data = await apiFetch("/api/videos");
       // API kann Array oder Objekt mit .Files / .Items zurückgeben
       allVideos = Array.isArray(data) ? data : (data.Files || data.Items || data.Data || []);
       loading.style.display = "none";
@@ -386,8 +378,7 @@
         <strong>Fehler beim Laden der Videos</strong>
         <pre>${err.message}</pre>
         <p style="margin-top:0.5rem;font-size:0.8rem;color:#888;">
-          Bitte API_KEY und PROJECT_ID in der index.html überprüfen.<br>
-          Falls ein CORS-Fehler auftritt, muss die Seite über einen Webserver ausgeliefert werden.
+          Bitte SDN_API_KEY und SDN_PROJECT_ID in der .env-Datei prüfen und den Server neu starten.
         </p>`;
     }
   }
