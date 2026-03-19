@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video – VfB Brüstring</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #f0f0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a1a1a;
+      border-bottom: 2px solid #e30613;
+      padding: 0.75rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #ccc;
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid #333;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .back-btn:hover {
+      background: #2a2a2a;
+      color: #fff;
+    }
+
+    .back-btn svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    header h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f0f0f0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .content {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    #loading {
+      text-align: center;
+      padding: 4rem;
+      color: #666;
+    }
+
+    #loading .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #333;
+      border-top-color: #e30613;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error {
+      display: none;
+      background: #2a0808;
+      border: 1px solid #e30613;
+      border-radius: 8px;
+      padding: 1.5rem;
+      color: #ff6b6b;
+      text-align: center;
+    }
+
+    #error pre {
+      margin-top: 0.5rem;
+      font-size: 0.8rem;
+      color: #cc4444;
+      white-space: pre-wrap;
+    }
+
+    .player-container {
+      display: none;
+    }
+
+    .player-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .player-wrapper iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .video-info {
+      margin-top: 1.25rem;
+      padding-bottom: 2rem;
+    }
+
+    .video-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .video-meta {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      font-size: 0.82rem;
+      color: #666;
+    }
+
+    .video-meta span { display: flex; align-items: center; gap: 0.3rem; }
+
+    .divider {
+      height: 1px;
+      background: #222;
+      margin: 1rem 0;
+    }
+
+    .video-description {
+      font-size: 0.9rem;
+      color: #aaa;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="index.html">
+    <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    Zurück
+  </a>
+  <h1 id="headerTitle">Video</h1>
+</header>
+
+<div class="content">
+  <div id="loading">
+    <div class="spinner"></div>
+    Video wird geladen…
+  </div>
+  <div id="error"></div>
+
+  <div class="player-container" id="playerContainer">
+    <div class="player-wrapper">
+      <iframe
+        id="playerFrame"
+        allowfullscreen
+        allow="autoplay; fullscreen; picture-in-picture"
+      ></iframe>
+    </div>
+    <div class="video-info">
+      <div class="video-title" id="videoTitle"></div>
+      <div class="video-meta" id="videoMeta"></div>
+      <div class="divider" id="divider" style="display:none"></div>
+      <div class="video-description" id="videoDescription"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ─── Konfiguration ────────────────────────────────────────────────────────
+  const API_KEY  = "DEIN_API_KEY_HIER";      // X-AUTH-APIKEY
+  const BASE_URL = "https://sdn.3qsdn.com/api/v2";
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // URL-Parameter auslesen
+  const params    = new URLSearchParams(location.search);
+  const projectId = params.get("projectId") || "";
+  const fileId    = params.get("fileId") || "";
+  const titleHint = params.get("title") || "Video";
+
+  document.title = `${titleHint} – VfB Brüstring`;
+  document.getElementById("headerTitle").textContent = titleHint;
+
+  async function apiFetch(path) {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      headers: {
+        "X-AUTH-APIKEY": API_KEY,
+        "Accept": "application/json"
+      }
+    });
+    if (!response.ok) throw new Error(`API-Fehler ${response.status}: ${response.statusText}`);
+    return response.json();
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds && seconds !== 0) return null;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    return `${m}:${String(s).padStart(2,"0")}`;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return null;
+    return d.toLocaleDateString("de-DE", { day:"2-digit", month:"2-digit", year:"numeric" });
+  }
+
+  function showError(msg, detail) {
+    document.getElementById("loading").style.display = "none";
+    const errEl = document.getElementById("error");
+    errEl.style.display = "block";
+    errEl.innerHTML = `<strong>${msg}</strong>${detail ? `<pre>${detail}</pre>` : ""}`;
+  }
+
+  async function loadVideo() {
+    if (!projectId || !fileId) {
+      showError("Fehlende Parameter", "projectId und fileId müssen in der URL angegeben sein.");
+      return;
+    }
+
+    try {
+      // Videodaten und Embed-URL parallel laden
+      const [fileData, embedData] = await Promise.all([
+        apiFetch(`/projects/${projectId}/files/${fileId}`),
+        apiFetch(`/projects/${projectId}/files/${fileId}/playouts/default/embed`)
+      ]);
+
+      const title       = fileData.FileName || fileData.Title || titleHint;
+      const description = fileData.Description || fileData.Tags || "";
+      const duration    = formatDuration(fileData.Duration);
+      const date        = formatDate(fileData.CreatedAt || fileData.Created);
+
+      // Embed-URL extrahieren – API gibt verschiedene Formate zurück
+      let embedSrc = "";
+      if (embedData) {
+        // Mögliche Felder: IframeUrl, EmbedUrl, Url, iFrame (HTML-String)
+        embedSrc = embedData.IframeUrl || embedData.EmbedUrl || embedData.Url || "";
+        if (!embedSrc && embedData.iFrame) {
+          // HTML-String parsen und src-Attribut extrahieren
+          const match = embedData.iFrame.match(/src=["']([^"']+)["']/i);
+          if (match) embedSrc = match[1];
+        }
+        // Fallback: Player-URL aus PlayoutId zusammenbauen
+        if (!embedSrc && embedData.PlayoutId) {
+          embedSrc = `https://playout.3qsdn.com/player/${embedData.PlayoutId}`;
+        }
+      }
+
+      if (!embedSrc) {
+        // Zweiter Fallback: direkt über FileId eine Playout-URL konstruieren
+        // (falls die API keinen Embed-Link liefert, aber eine sdnPlayoutId bekannt ist)
+        if (fileData.sdnPlayoutId || fileData.PlayoutId) {
+          embedSrc = `https://playout.3qsdn.com/player/${fileData.sdnPlayoutId || fileData.PlayoutId}`;
+        }
+      }
+
+      if (!embedSrc) {
+        showError("Kein Player gefunden", "Die API hat keine Embed-URL für dieses Video zurückgegeben.");
+        return;
+      }
+
+      // Player befüllen
+      document.getElementById("playerFrame").src = embedSrc;
+      document.getElementById("videoTitle").textContent = title;
+      document.title = `${title} – VfB Brüstring`;
+      document.getElementById("headerTitle").textContent = title;
+
+      // Metadaten
+      const metaEl = document.getElementById("videoMeta");
+      const metaItems = [];
+      if (date)     metaItems.push(`<span>&#128197; ${date}</span>`);
+      if (duration) metaItems.push(`<span>&#9200; ${duration}</span>`);
+      if (fileData.FileFormat) metaItems.push(`<span>&#127909; ${fileData.FileFormat}</span>`);
+      metaEl.innerHTML = metaItems.join("");
+
+      // Beschreibung
+      if (description) {
+        document.getElementById("divider").style.display = "block";
+        document.getElementById("videoDescription").textContent = description;
+      }
+
+      document.getElementById("loading").style.display   = "none";
+      document.getElementById("playerContainer").style.display = "block";
+
+    } catch (err) {
+      showError("Fehler beim Laden des Videos", err.message);
+    }
+  }
+
+  loadVideo();
+</script>
+</body>
+</html>
